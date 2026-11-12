@@ -1,0 +1,4 @@
+# Local only: earlier versions, research notes and full-size preview renders
+backups/
+previews/
+.DS_Store
