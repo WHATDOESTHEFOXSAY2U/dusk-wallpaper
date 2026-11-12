@@ -4,7 +4,8 @@
 // nothing changes or nobody can see it. The gradient is a small 16-bit Display P3 bitmap that Core Animation stretches
 // over the screen; the type is two small alpha masks tinted with the palette's ink. Auto flows from one gradient to the
 // next in steps too small to see: round the light palettes by day and through shades of Night after dark, following
-// the Mac's Light and Dark appearance. Build and install with ./build.sh.
+// the Mac's Light and Dark appearance. It behaves as a wallpaper does: it starts with the Mac and stays up when the app
+// is quit, until it is turned off. Build and install with ./build.sh.
 //
 // Headless (no window; for checks and exports):
 //   DuskWallpaper --render out.png [--size 1800x1169] [--scale 2] [--date 2026-11-11] [--no-strip] [--no-info] [--no-text]
@@ -147,7 +148,7 @@ struct Settings: Codable {
     var mode = Mode.auto
     var preset = "dusk"
     var custom = Array(Presets.palette("dusk").c[0..<3])
-    var strip = true, info = true, openAtLogin = false
+    var strip = true, info = true, startAtLogin = true
     // Auto: what is on screen is a pure function of the clock and these three values, so nothing can drift.
     var pace: TimeInterval = 20
     var autoStart = Date(timeIntervalSinceReferenceDate: 0)
@@ -158,7 +159,7 @@ struct Settings: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func saved<T: Decodable>(_ key: CodingKeys, or value: T) -> T { (try? c.decode(T.self, forKey: key)) ?? value }
         mode = saved(.mode, or: mode); preset = saved(.preset, or: preset); custom = saved(.custom, or: custom)
-        strip = saved(.strip, or: strip); info = saved(.info, or: info); openAtLogin = saved(.openAtLogin, or: openAtLogin)
+        strip = saved(.strip, or: strip); info = saved(.info, or: info); startAtLogin = saved(.startAtLogin, or: startAtLogin)
         pace = saved(.pace, or: pace); autoStart = saved(.autoStart, or: autoStart); autoBase = saved(.autoBase, or: autoBase)
     }
 
@@ -545,7 +546,7 @@ final class TextMask: CALayer {
     private var status: NSStatusItem?
     private var panel: NSWindow?
     private var controls: Controls?
-    private var synced = "", glideEnd = Date.distantPast
+    private var synced = "", glideEnd = Date.distantPast, turningOff = false
     private var appearanceWatch: NSKeyValueObservation?
     /// Light or Dark, as the Mac is now. On a Mac whose appearance is set to Auto this turns at sunset and sunrise.
     private var isDark: Bool { NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
@@ -572,8 +573,10 @@ final class TextMask: CALayer {
         appearanceWatch = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in       // day turns to night, or back
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.refresh() } }
         }
-        // A rebuilt app can lose its login registration; put it back if the owner asked for it.
-        if settings.openAtLogin && SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
+        // A wallpaper starts with the Mac unless its owner has said otherwise: once it sits in an Applications folder it
+        // registers itself, and again whenever a rebuild has cost it the registration. A copy run from anywhere else does not.
+        let installed = Bundle.main.bundleURL.deletingLastPathComponent().lastPathComponent == "Applications"
+        if settings.startAtLogin && installed && SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
         let event = NSAppleEventManager.shared().currentAppleEvent
         let atLogin = event?.eventID == kAEOpenApplication && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
         let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.launchDate
@@ -581,6 +584,15 @@ final class TextMask: CALayer {
         if !atLogin && !justLoggedIn && !CommandLine.arguments.contains("--background") { showSettings() }
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showSettings(); return false }
+
+    /// Quitting while the settings are open only puts them away: the wallpaper stays up, as a wallpaper should.
+    /// It ends when it is turned off, when it is told to quit while in the background, and when the Mac logs out, restarts or shuts down.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let leaving = NSAppleEventManager.shared().currentAppleEvent?.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil
+        guard let panel, !turningOff, !leaving else { return .terminateNow }
+        panel.close()
+        return .terminateCancel
+    }
 
     /// The one update. Keeps one window per display, the date current, the right picture on screen and at most one timer armed.
     private func refresh(fade: CFTimeInterval? = nil) {
@@ -661,9 +673,10 @@ final class TextMask: CALayer {
         do { if sender.state == .on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
         catch { NSAlert(error: error).runModal() }
         sender.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        settings.openAtLogin = sender.state == .on
+        settings.startAtLogin = sender.state == .on
         settings.save()
     }
+    @objc private func turnOff() { turningOff = true; NSApp.terminate(nil) }
 
     // MARK: Menus
 
@@ -688,18 +701,16 @@ final class TextMask: CALayer {
         }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
-        menu.addItem(withTitle: "Quit Dusk Wallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Turn Off Wallpaper", action: #selector(turnOff), keyEquivalent: "").target = self
     }
 
     private func buildMainMenu() {                                             // only seen while the settings window is open
         // macOS adds dictation and emoji items to an Edit menu by itself, and to one built in code several times over.
         UserDefaults.standard.register(defaults: ["NSDisabledDictationMenuItem": true, "NSDisabledCharacterPaletteMenuItem": true])
         let main = NSMenu(), appMenu = NSMenu(), file = NSMenu(title: "File"), edit = NSMenu(title: "Edit")
-        appMenu.addItem(withTitle: "About Dusk Wallpaper", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit Dusk Wallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit Dusk Wallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")     // puts the settings away; see applicationShouldTerminate
         file.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         for (name, action, key) in [("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"),      // so a colour code can be pasted
                                     ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")] {
@@ -760,14 +771,14 @@ final class TextMask: CALayer {
         }
         let strip = NSButton(checkboxWithTitle: "Line of days", target: self, action: #selector(toggleStrip(_:)))
         let info = NSButton(checkboxWithTitle: "Week number and days left", target: self, action: #selector(toggleInfo(_:)))
-        let login = NSButton(checkboxWithTitle: "Open at login", target: self, action: #selector(toggleLogin(_:)))
-        let quit = NSButton(title: "Quit Dusk Wallpaper", target: NSApp, action: #selector(NSApplication.terminate(_:)))
+        let login = NSButton(checkboxWithTitle: "Start at login", target: self, action: #selector(toggleLogin(_:)))
+        let off = NSButton(title: "Turn Off Wallpaper", target: self, action: #selector(turnOff))
 
         let stack = NSStackView(views: [
             label("Gradient", bold: true), row(swatches), row([label("Own colours")] + wells),
             flow, indent(label("Light by day, Night after dark: it follows this Mac's appearance.", small: true)), rule(),
             label("Show", bold: true), strip, info, rule(),
-            login, label("The wallpaper keeps running after you close this window.", small: true), quit])
+            login, label("The wallpaper stays on when you close or quit this app.", small: true), off])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
@@ -807,6 +818,7 @@ final class TextMask: CALayer {
     func settingsPNG() -> Data? {
         let window = makePanel()
         guard let view = window.contentView else { return nil }
+        controls?.login.state = settings.startAtLogin ? .on : .off
         view.wantsLayer = true                                                 // give the picture the window's own background, light or dark
         view.effectiveAppearance.performAsCurrentDrawingAppearance { view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor }
         view.layoutSubtreeIfNeeded()

@@ -1,4 +1,5 @@
-# Local only: earlier versions, research notes and full-size preview renders
+# Local only: earlier versions, research notes, full-size preview renders, built installers
 backups/
 previews/
+*.dmg
 .DS_Store

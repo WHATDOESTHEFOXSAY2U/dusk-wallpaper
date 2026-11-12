@@ -58,16 +58,18 @@ Needs Apple silicon, macOS 14 or later, and Apple's command-line tools (`xcode-s
 
 Click the sun in the menu bar. Pick a gradient, or let it flow.
 
+It starts with your Mac and stays on when you quit the app. *Turn Off Wallpaper*, in the same menu, stops it.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/settings-dark.png">
-    <img src="docs/settings-light.png" width="400" alt="The settings window: gradient swatches, your own colours, the flow and its pace, what to show, and open at login">
+    <img src="docs/settings-light.png" width="400" alt="The settings window: gradient swatches, your own colours, the flow and its pace, what to show, start at login, and Turn Off Wallpaper">
   </picture>
 </p>
 
 ## Remove
 
-Untick *Open at login*, quit from the menu, and move the app to the Trash.
+Untick *Start at login*, choose *Turn Off Wallpaper*, and move the app to the Trash.
 
 <details>
 <summary>More</summary>
@@ -82,6 +84,8 @@ Untick *Open at login*, quit from the menu, and move the app to the Trash.
 ```
 
 Every option is listed at the top of `app/main.swift`.
+
+**An installer to pass on.** `./build.sh --dmg "Dusk Wallpaper.dmg"` packs the app into a disk image: open it, drag the app to Applications. The app is not notarised by Apple, so on another Mac the first launch has to be allowed under System Settings › Privacy & Security.
 
 **Clear the settings.** `defaults delete local.dusk.wallpaper`
 
