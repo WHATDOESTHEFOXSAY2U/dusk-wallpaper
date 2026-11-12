@@ -588,7 +588,8 @@ final class TextMask: CALayer {
     /// Quitting while the settings are open only puts them away: the wallpaper stays up, as a wallpaper should.
     /// It ends when it is turned off, when it is told to quit while in the background, and when the Mac logs out, restarts or shuts down.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        let leaving = NSAppleEventManager.shared().currentAppleEvent?.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil
+        let event = NSAppleEventManager.shared().currentAppleEvent, why = AEKeyword(kAEQuitReason)     // the system says why it asks; a person does not
+        let leaving = event?.attributeDescriptor(forKeyword: why) != nil || event?.paramDescriptor(forKeyword: why) != nil
         guard let panel, !turningOff, !leaving else { return .terminateNow }
         panel.close()
         return .terminateCancel
