@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds Dusk Wallpaper. Needs only Xcode's command-line tools (swiftc, codesign).
+# Builds Dusk Wallpaper. Needs only Apple's command-line tools (swiftc, codesign), from Xcode 26 or later.
 #
 #   ./build.sh              build, replace the copy in /Applications, restart it quietly
 #   ./build.sh --dmg FILE   build, and pack the app into a disk image to install on another Mac
@@ -15,17 +15,20 @@ MIN_MACOS="14.0"
 MODE="${1:-install}"
 case "$MODE" in
   install) ;;
-  --dmg) DMG="${2:?usage: build.sh --dmg FILE}"; DMG="${DMG:a}" ;;
+  --dmg) DMG="${2:?usage: build.sh --dmg FILE}"; DMG="${DMG:a}"; DMG="${DMG%.dmg}.dmg" ;;
   --dev) DEST="${2:?usage: build.sh --dev DIR}"; DEST="${DEST:a}"; ID="$ID.dev"; mkdir -p "$DEST" ;;
   *) echo "usage: build.sh [--dmg FILE | --dev DIR]" >&2; exit 2 ;;
 esac
 cd "$(dirname "$0")"
+command -v swiftc >/dev/null || { echo "Apple's command-line tools are missing. Install them with: xcode-select --install" >&2; exit 1; }
+[[ $MODE != install || -w "$DEST" ]] || { echo "Cannot write to $DEST, so nothing was changed." >&2; exit 1; }
 
 STAGE="$(mktemp -d)"
 APP="$STAGE/$NAME.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-swiftc -swift-version 6 -O -target "arm64-apple-macos$MIN_MACOS" main.swift -o "$APP/Contents/MacOS/DuskWallpaper"
+swiftc -swift-version 6 -O -target "arm64-apple-macos$MIN_MACOS" main.swift -o "$APP/Contents/MacOS/DuskWallpaper" ||
+  { echo "The build failed. It needs the command-line tools of Xcode 26 or later (this Mac has: $(swiftc --version 2>&1 | head -1))." >&2; rm -rf "$STAGE"; exit 1; }
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -37,8 +40,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleExecutable</key><string>DuskWallpaper</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>2.2</string>
-  <key>CFBundleVersion</key><string>5</string>
+  <key>CFBundleShortVersionString</key><string>2.3</string>
+  <key>CFBundleVersion</key><string>6</string>
   <key>LSMinimumSystemVersion</key><string>$MIN_MACOS</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
@@ -59,8 +62,8 @@ if [[ $MODE == --dmg ]]; then                 # the app beside a shortcut to App
 fi
 
 if [[ $MODE == install ]]; then               # stop the running copy and wait until it is really gone
-  pkill -x DuskWallpaper || true
-  for i in {1..50}; do pgrep -x DuskWallpaper >/dev/null || break; sleep 0.1; done
+  pkill -x -U "$UID" DuskWallpaper || true
+  for i in {1..50}; do pgrep -x -U "$UID" DuskWallpaper >/dev/null || break; sleep 0.1; done
 fi
 rm -rf "$DEST/$NAME.app"
 mv "$APP" "$DEST/"
@@ -69,5 +72,5 @@ echo "Built $DEST/$NAME.app"
 if [[ $MODE == install ]]; then               # start it again without opening the settings window
   for i in {1..5}; do open "$DEST/$NAME.app" --args --background 2>/dev/null && break; sleep 1; done
   sleep 1
-  pgrep -x DuskWallpaper >/dev/null || { echo "The app was installed but did not start; open it from Applications." >&2; exit 1; }
+  pgrep -x -U "$UID" DuskWallpaper >/dev/null || { echo "The app was installed but did not start; open it from Applications." >&2; exit 1; }
 fi

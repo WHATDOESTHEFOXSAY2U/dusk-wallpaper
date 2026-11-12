@@ -21,7 +21,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Colour and palettes
 
-/// A colour as gamma-encoded Display P3 components, 0...1. This panel's primaries are the P3 primaries, so these reach it unchanged.
+/// A colour as gamma-encoded Display P3 components, 0...1. A Display P3 screen shows them as they are.
 struct RGB: Equatable, Codable {
     var r, g, b: Double
     init(_ r: Double, _ g: Double, _ b: Double) { self.r = r; self.g = g; self.b = b }
@@ -284,7 +284,7 @@ enum Lettering {
     /// Everything that is written on the wallpaper for `date`, as marks in canvas points: a small date block lower left
     /// and one line of the month's days.
     ///
-    /// The numbers are the stylesheet of the web page this look was approved on (kept in backups/): vw and vh are hundredths of
+    /// The numbers are the stylesheet of the web page this look was first drawn on: vw and vh are hundredths of
     /// the canvas, sizes and gaps are that page's values, and strut, box and rise reproduce how a browser places a line of text.
     /// On an upright (rotated) display vh follows the width instead, so the type keeps its proportions.
     static func layout(canvas: CGSize, date: Date, strip showStrip: Bool, info showInfo: Bool) -> (block: [Mark], strip: [Mark]) {
@@ -380,7 +380,7 @@ final class TextMask: CALayer {
     private var fade: (from: Palette, oldOnTop: Bool)?                                  // while a fade runs: the picture in `old`, and which layer is fading
     private var flowKeys: (a: Palette, b: Palette)?                                     // while flowing: the two key pictures loaded in `old` and `gradient`
     private var generation = 0, size = CGSize.zero, scale: CGFloat = 0, textKey = ""
-    private var pixels: (w: Int, h: Int) {                                              // 450 x 292 here: finer gains nothing once stretched
+    private var pixels: (w: Int, h: Int) {                                              // 450 x 292 on a 14-inch MacBook Pro: finer gains nothing once stretched
         let k = 450 / max(size.width, size.height, 1)
         return (max(64, Int(size.width * k)), max(64, Int(size.height * k)))
     }
@@ -597,6 +597,7 @@ final class TextMask: CALayer {
     /// The one update. Keeps one window per display, the date current, the right picture on screen and at most one timer armed.
     private func refresh(fade: CFTimeInterval? = nil) {
         let now = Date(), dark = isDark, target = settings.palette(at: now, dark: dark)
+        if glideEnd.timeIntervalSince(now) > 5 { glideEnd = .distantPast }     // the clock was set back: no glide lasts that long
         var present = Set<CGDirectDisplayID>()
         for screen in NSScreen.screens where screen.frame.width > 0 && screen.frame.height > 0 {
             guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { continue }
@@ -638,7 +639,7 @@ final class TextMask: CALayer {
         if fade != nil || look != synced { synced = look; syncPanel() }         // the settings window only needs telling when something it shows changed
     }
 
-    private func change(fade: CFTimeInterval, _ edit: (inout Settings) -> Void) {
+    private func change(fade: CFTimeInterval?, _ edit: (inout Settings) -> Void) {
         edit(&settings)
         settings.save()
         refresh(fade: fade)
@@ -667,8 +668,8 @@ final class TextMask: CALayer {
         guard let c = sender.color.usingColorSpace(.displayP3), (0..<3).contains(sender.tag) else { return }
         change(fade: 0) { $0.custom[sender.tag] = RGB(c.redComponent, c.greenComponent, c.blueComponent); $0.mode = .custom }
     }
-    @objc private func toggleStrip(_ sender: NSButton) { change(fade: 0) { $0.strip = sender.state == .on } }
-    @objc private func toggleInfo(_ sender: NSButton) { change(fade: 0) { $0.info = sender.state == .on } }
+    @objc private func toggleStrip(_ sender: NSButton) { change(fade: nil) { $0.strip = sender.state == .on } }       // the type changes; the picture carries on
+    @objc private func toggleInfo(_ sender: NSButton) { change(fade: nil) { $0.info = sender.state == .on } }
     @objc private func toggleLogin(_ sender: NSButton) {
         do { if sender.state == .on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
         catch { NSAlert(error: error).runModal() }

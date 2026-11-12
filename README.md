@@ -14,13 +14,13 @@
 <h3 align="center">Colour that flows.</h3>
 <p align="center">One gradient drifts into the next, all day.</p>
 <p align="center"><img src="docs/flow-day.webp" width="640" alt="The wallpaper flowing from Dusk through Meadow, Ember, Ocean and Dawn"></p>
-<p align="center"><sub>Sped up here. You set the pace, from 10 seconds to 5 minutes a gradient.</sub></p>
 
 <br>
 
 <h3 align="center">Dark after dark.</h3>
-<p align="center">It follows your Mac's appearance. On Auto, it turns at sunset.</p>
+<p align="center">While it flows, it follows your Mac's appearance. On Auto, it turns at sunset.</p>
 <p align="center"><img src="docs/flow-night.webp" width="640" alt="The Night gradient with its hues slowly swinging"></p>
+<p align="center"><sub>Both clips are sped up. You set the pace, from 10 seconds to 5 minutes a gradient.</sub></p>
 
 <br>
 
@@ -48,7 +48,7 @@
 
 **[Download Dusk Wallpaper](https://github.com/WHATDOESTHEFOXSAY2U/dusk-wallpaper/releases/latest/download/Dusk-Wallpaper.dmg)**, open it, and drag the app onto Applications.
 
-Needs Apple silicon and macOS 14 or later. The app is not notarised by Apple, so the first time you open it, allow it under System Settings › Privacy & Security.
+Needs Apple silicon and macOS 14 or later. The app is not notarised by Apple, so macOS refuses to open it the first time. After that, System Settings › Privacy & Security offers **Open Anyway**.
 
 <details>
 <summary>Or build it yourself</summary>
@@ -60,7 +60,7 @@ cd dusk-wallpaper/app
 ./build.sh
 ```
 
-Needs Apple's command-line tools (`xcode-select --install`).
+Needs Apple's command-line tools from Xcode 26 or later (`xcode-select --install`). The script builds the app, puts it in Applications and starts it.
 
 </details>
 
@@ -68,7 +68,7 @@ Needs Apple's command-line tools (`xcode-select --install`).
 
 Click the sun in the menu bar. Pick a gradient, or let it flow.
 
-It starts with your Mac and stays on when you quit the app. *Turn Off Wallpaper*, in the same menu, stops it.
+It starts with your Mac and stays on when you quit the app. *Turn Off Wallpaper*, in the same menu, stops it until you open the app or log in again.
 
 <p align="center">
   <picture>
@@ -79,13 +79,13 @@ It starts with your Mac and stays on when you quit the app. *Turn Off Wallpaper*
 
 ## Remove
 
-Untick *Start at login*, choose *Turn Off Wallpaper*, and move the app to the Trash.
+In Settings, untick *Start at login* and choose *Turn Off Wallpaper*. Then move the app to the Trash.
 
 <details>
 <summary>More</summary>
 <br>
 
-**How it stays light.** The gradient is a small picture that Core Animation stretches and the graphics chip blends. The type is two small masks. No web view, no helper processes. Flowing takes a few percent of one core. At rest, or with the desktop covered, it takes none.
+**How it stays light.** The gradient is a small picture that Core Animation stretches and the graphics chip blends. The type is two small masks. No web view, no helper processes. Flowing takes a few per cent of one core. At rest, or with the desktop covered, it takes none.
 
 **A still for your phone.**
 
@@ -97,6 +97,6 @@ Every option is listed at the top of `app/main.swift`.
 
 **Make the installer yourself.** `./build.sh --dmg Dusk-Wallpaper.dmg`
 
-**Clear the settings.** `defaults delete local.dusk.wallpaper`
+**Clear the settings.** With the wallpaper off: `defaults delete local.dusk.wallpaper`
 
 </details>
