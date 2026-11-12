@@ -46,13 +46,23 @@
 
 ## Install
 
+**[Download Dusk Wallpaper](https://github.com/WHATDOESTHEFOXSAY2U/dusk-wallpaper/releases/latest/download/Dusk-Wallpaper.dmg)**, open it, and drag the app onto Applications.
+
+Needs Apple silicon and macOS 14 or later. The app is not notarised by Apple, so the first time you open it, allow it under System Settings › Privacy & Security.
+
+<details>
+<summary>Or build it yourself</summary>
+<br>
+
 ```bash
 git clone https://github.com/WHATDOESTHEFOXSAY2U/dusk-wallpaper.git
 cd dusk-wallpaper/app
 ./build.sh
 ```
 
-Needs Apple silicon, macOS 14 or later, and Apple's command-line tools (`xcode-select --install`).
+Needs Apple's command-line tools (`xcode-select --install`).
+
+</details>
 
 ## Use
 
@@ -85,7 +95,7 @@ Untick *Start at login*, choose *Turn Off Wallpaper*, and move the app to the Tr
 
 Every option is listed at the top of `app/main.swift`.
 
-**An installer to pass on.** `./build.sh --dmg "Dusk Wallpaper.dmg"` packs the app into a disk image: open it, drag the app to Applications. The app is not notarised by Apple, so on another Mac the first launch has to be allowed under System Settings › Privacy & Security.
+**Make the installer yourself.** `./build.sh --dmg Dusk-Wallpaper.dmg`
 
 **Clear the settings.** `defaults delete local.dusk.wallpaper`
 
